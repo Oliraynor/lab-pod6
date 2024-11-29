@@ -1,0 +1,136 @@
+---
+ndo:
+  schemas:
+    - name: schema_lab_pod6_ms
+      templates:
+
+        #### Template Infra
+        - name: templ_lab_pod6_infra
+          description: Template for Common configuration objects
+          type: multi_site
+          tenant: lab_pod6_ms
+          sites:
+          - DC1
+          - DC2
+          deploy_order: 1
+
+         ## VRFs 
+          vrfs:
+          - name: vrf_pod6_ms
+
+          ## Contracts  
+          contracts:
+            - name: ct_web_to_app
+              scope: context
+              filters:
+                - name: ft_https
+
+          ## Filters
+          filters:
+            - name: ft_https
+              entries:
+                - name: tcp-443
+                  ethertype: ipv4
+                  protocol: tcp
+                  destination_from_port: https
+                  destination_to_port: https
+                  stateful: true
+
+        #### Template DC1 Only
+        - name: templ_lab_pod6_dc1
+          description: Template for objects local to site DC1
+          type: multi_site
+          tenant: lab_pod6_ms
+          sites:
+          - DC1
+          deploy_order: 2
+
+          ## Bridge Domains
+          bridge_domains:
+            - name: bd_vlan_1601
+              description: Bridge-Domain for Lab Pod 6 MS - Only in DC1 - VLAN 1601
+              l2_stretch: false
+              unicast_routing: true
+              vrf:
+                name: vrf_pod6_ms
+                template: templ_lab_pod6_infra
+              sites:
+                - name: DC1
+                  subnets:
+                    - ip: 192.168.1.254/24
+                      scope: private
+                      primary: true
+
+          ## Application Profile & EPGs
+          application_profiles:
+            - name: ap_pod6_ms_dc1
+              endpoint_groups:
+                - name: epg_vlan_1601
+                  description: EPG for VLAN 1601 for Web Users
+                  bridge_domain:
+                    name: bd_vlan_1601
+                  contracts:
+                    consumers:
+                      - name: ct_web_to_app
+                        template: templ_lab_pod6_infra
+                  sites:
+                    - name: DC1
+                      physical_domains:
+                        - name: phy-dom_lab_pod6_ms
+                      static_ports:
+                        - type: port
+                          vlan: 1601 
+                          mode: regular
+                          node: 101
+                          port: 16
+
+
+        #### Template Stretched
+        - name: templ_lab_pod6_stretched
+          description: Template for objects stretched between sites
+          type: multi_site
+          tenant: lab_pod6_ms
+          sites:
+          - DC1
+          - DC2
+          deploy_order: 3
+
+          ## Bridge Domains
+          bridge_domains:
+            - name: bd_vlan_1602
+              description: BD for Lab Pod 6 MS - L2 Stretched in DC1 and DC2 - VLAN 1602
+              l2_stretch: true
+              intersite_bum_traffic: true
+              unicast_routing: true
+              vrf:
+                name: vrf_pod6_ms
+                template: templ_lab_pod6_infra
+              subnets:
+                - ip: 192.168.2.254/24
+                  scope: private
+                  primary: true
+              
+
+          ## Application Profile & EPGs
+          application_profiles:
+            - name: ap_pod6_ms_stretched
+              endpoint_groups:
+                - name: epg_vlan_1602
+                  description: EPG for VLAN 1602 for App Servers
+                  bridge_domain:
+                    name: bd_vlan_1602
+                  contracts:
+                    providers:
+                      - name: ct_web_to_app
+                        template: templ_lab_pod6_infra
+                  sites:
+                    - name: DC2
+                      physical_domains:
+                        - name: phy-dom_lab_pod6_ms
+                      static_ports:
+                        - type: vpc
+                          vlan: 1602 
+                          mode: regular
+                          node_1: 101
+                          node_2: 102
+                          channel: ipg_lab_pod6_serverC_vpc1

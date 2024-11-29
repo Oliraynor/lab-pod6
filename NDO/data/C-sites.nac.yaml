@@ -1,0 +1,11 @@
+---
+ndo:
+  sites:
+    - name: DC1
+      apic_urls:
+        - "https://198.18.133.200"
+      id: 1        
+    - name: DC2
+      apic_urls:
+        - "https://198.18.132.200"
+      id: 2   

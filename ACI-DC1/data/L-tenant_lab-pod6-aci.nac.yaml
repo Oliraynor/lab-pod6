@@ -1,0 +1,136 @@
+---
+apic:
+  tenants:
+      ## Base Config - Name
+    - name: lab_pod6_aci
+
+      ## Tenant Policies
+
+      ## VRFs
+      vrfs:
+        - name: vrf_pod6_aci
+
+
+      ## Bridge Domains
+      bridge_domains:
+        - name: bd_vlan_601
+          description: Bridge-Domain for Lab Pod 6 ACI - VLAN 601
+          vrf: vrf_pod6_aci
+          unicast_routing: true
+          l3outs:
+            - l3out_pod6_aci
+          subnets:
+            - ip: 192.168.1.254/24
+              description: Subnet 192.168.1.0/24
+              primary_ip: true
+              public: true
+
+        - name: bd_vlan_602
+          description: Bridge-Domain for Lab Pod 6 ACI - VLAN 602
+          vrf: vrf_pod6_aci
+          unicast_routing: true
+          l3outs:
+            - l3out_pod6_aci
+          subnets:
+            - ip: 192.168.2.254/24
+              description: Subnet 192.168.2.0/24
+              primary_ip: true
+              public: true
+
+
+      ## L3Out
+      l3outs:
+        - name: l3out_pod6_aci
+          vrf: vrf_pod6_aci
+          domain: l3-dom_lab_ext
+          external_endpoint_groups:
+            - name: extepg_any
+              subnets:
+                - prefix: 0.0.0.0/0
+              contracts:
+                consumers:
+                  - ct_web_to_app
+
+
+      ## Application Profile & EPG
+      application_profiles:
+        - name: ap_pod6_aci
+          managed: true
+          endpoint_groups:
+
+            - name: epg_vlan_601
+              description: EPG for VLAN 601 for App Servers
+              bridge_domain: bd_vlan_601
+              physical_domains:
+                - phy-dom_lab_pod6_aci
+              contracts:
+                consumers:
+                  - ct_app_to_db
+                providers:
+                  - ct_web_to_app
+              static_ports:
+
+                - node_id: 101
+                  port: 16
+                  vlan: 601
+                  deployment_immediacy: immediate
+                  mode: regular
+
+            - name: epg_vlan_602
+              description: EPG for VLAN 602 for DB Servers
+              bridge_domain: bd_vlan_602
+              physical_domains:
+                - phy-dom_lab_pod6_aci
+              contracts:
+                providers:
+                  - ct_app_to_db
+              static_ports:
+
+                - node_id: 101
+                  node2_id: 102
+                  channel: ipg_lab_pod6_serverA_vpc1
+                  vlan: 602
+                  deployment_immediacy: immediate
+                  mode: regular
+
+
+      ## Contracts
+      contracts:
+        - name: ct_web_to_app
+          description: Contract from Web to App
+          subjects:
+            - name: sj_https
+              description: Subject for HTTPS
+              filters:
+                - filter: ft_https
+
+        - name: ct_app_to_db
+          description: Contract from App to DB
+          subjects:
+            - name: sj_sql
+              description: Subject for SQL
+              filters:
+                - filter: ft_sql
+
+
+      ## Filters  
+      filters:
+        - name: ft_https
+          description: Filter for HTTPS traffic on Port TCP/443
+          entries:
+          - name: tcp-443
+            ethertype: ipv4
+            protocol: tcp
+            destination_from_port: https
+            destination_to_port: https
+            stateful: true
+
+        - name: ft_sql
+          description: Filter for SQL traffic on Port TCP/1443
+          entries:
+          - name: tcp-1433
+            ethertype: ipv4
+            protocol: tcp
+            destination_from_port: 1433
+            destination_to_port: 1433
+            stateful: true
